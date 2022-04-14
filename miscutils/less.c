@@ -155,6 +155,7 @@
 #define ESC "\033"
 /* The escape codes for highlighted and normal text */
 #define HIGHLIGHT   ESC"[7m"
+#define UNHIGHLIGHT ESC"[27m"
 #define NORMAL      ESC"[m"
 /* The escape code to home and clear to the end of screen */
 #define CLEAR       ESC"[H"ESC"[J"
@@ -312,13 +313,13 @@ static void clear_line(void)
 
 static void print_hilite(const char *str)
 {
-	printf(HIGHLIGHT"%s"NORMAL, str);
+	printf(HIGHLIGHT"%s"UNHIGHLIGHT, str);
 }
 
 static void print_statusline(const char *str)
 {
 	clear_line();
-	printf(HIGHLIGHT"%.*s"NORMAL, width - 1, str);
+	printf(HIGHLIGHT"%.*s"UNHIGHLIGHT, width - 1, str);
 }
 
 /* Exit the program gracefully */
@@ -710,7 +711,7 @@ static void m_status_print(void)
 		percent = (100 * last + num_lines/2) / num_lines;
 		printf(" %i%%", percent <= 100 ? percent : 100);
 	}
-	printf(NORMAL);
+	printf(UNHIGHLIGHT);
 }
 #endif
 
@@ -740,7 +741,7 @@ static void status_print(void)
 	if (!cur_fline)
 		p = filename;
 	if (num_files > 1) {
-		printf(HIGHLIGHT"%s (file %i of %i)"NORMAL,
+		printf(HIGHLIGHT"%s (file %i of %i)"UNHIGHLIGHT,
 				p, current_file, num_files);
 		return;
 	}
@@ -807,7 +808,7 @@ static void print_found(const char *line)
 	/* buf[] holds quarantined version of str */
 
 	/* Each part of the line that matches has the HIGHLIGHT
-	 * and NORMAL escape sequences placed around it.
+	 * and UNHIGHLIGHT escape sequences placed around it.
 	 * NB: we regex against line, but insert text
 	 * from quarantined copy (buf[]) */
 	str = buf;
@@ -816,7 +817,7 @@ static void print_found(const char *line)
 	goto start;
 
 	while (match_status == 0) {
-		char *new = xasprintf("%s%.*s"HIGHLIGHT"%.*s"NORMAL,
+		char *new = xasprintf("%s%.*s"HIGHLIGHT"%.*s"UNHIGHLIGHT,
 				growline ? growline : "",
 				(int)match_structs.rm_so, str,
 				(int)(match_structs.rm_eo - match_structs.rm_so),
@@ -1560,7 +1561,7 @@ static void show_flag_status(void)
 	}
 
 	clear_line();
-	printf(HIGHLIGHT"The status of the flag is: %u"NORMAL, flag_val != 0);
+	printf(HIGHLIGHT"The status of the flag is: %u"UNHIGHLIGHT, flag_val != 0);
 }
 #endif
 
