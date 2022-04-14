@@ -139,7 +139,7 @@
 //usage:     "\n	-S	Truncate long lines"
 //usage:	)
 //usage:	IF_FEATURE_LESS_RAW(
-//usage:     "\n	-R	Remove color escape codes in input"
+//usage:     "\n	-R	Output 'raw' color escape codes"
 //usage:	)
 //usage:     "\n	-~	Suppress ~s displayed past EOF"
 
@@ -228,9 +228,6 @@ struct globals {
 	int num_matches;
 	regex_t pattern;
 	smallint pattern_valid;
-#endif
-#if ENABLE_FEATURE_LESS_RAW
-	smallint in_escape;
 #endif
 #if ENABLE_FEATURE_LESS_ASK_TERMINAL
 	smallint winsize_err;
@@ -541,26 +538,6 @@ static void read_lines(void)
 				*--p = '\0';
 				continue;
 			}
-#if ENABLE_FEATURE_LESS_RAW
-			if (option_mask32 & FLAG_R) {
-				if (c == '\033')
-					goto discard;
-				if (G.in_escape) {
-					if (isdigit(c)
-					 || c == '['
-					 || c == ';'
-					 || c == 'm'
-					) {
- discard:
-						G.in_escape = (c != 'm');
-						readpos++;
-						continue;
-					}
-					/* Hmm, unexpected end of "ESC [ N ; N m" sequence */
-					G.in_escape = 0;
-				}
-			}
-#endif
 			{
 				size_t new_last_line_pos = last_line_pos + 1;
 				if (c == '\t') {
@@ -864,13 +841,40 @@ static void print_found(const char *line)
 void print_found(const char *line);
 #endif
 
+#if ENABLE_FEATURE_LESS_RAW
+static size_t count_colctrl(const char *str)
+{
+	const char *s = str;
+	char c = *(++s);
+	if (c == '[') {
+		do {
+			c = *(++s);
+		} while (isdigit(c) || c == ';');
+		if (c == 'm')
+			return ++s - str;
+	}
+	return 0;
+}
+#endif
+
 static void print_ascii(const char *str)
 {
 	char buf[width+1];
 	char *p;
 	size_t n;
+#if ENABLE_FEATURE_LESS_RAW
+	size_t esc = 0;
+#endif
 
 	while (*str) {
+#if ENABLE_FEATURE_LESS_RAW
+		if (esc) {
+			printf("%.*s", (int) esc, str);
+			str += esc;
+			esc = 0;
+			continue;
+		}
+#endif
 		n = strcspn(str, controls);
 		if (n) {
 			if (!str[n]) break;
@@ -886,6 +890,13 @@ static void print_ascii(const char *str)
 			/* VT100's CSI, aka Meta-ESC. Who's inventor? */
 			/* I want to know who committed this sin */
 				*p++ = '{';
+#if ENABLE_FEATURE_LESS_RAW
+			else if ((option_mask32 & FLAG_R)
+					 && *str == '\033'
+					 && (esc = count_colctrl(str))) {
+				break; // flush collected control chars
+			}
+#endif
 			else
 				*p++ = ctrlconv[(unsigned char)*str];
 			str++;
@@ -894,6 +905,10 @@ static void print_ascii(const char *str)
 		print_hilite(buf);
 	}
 	puts(str);
+#if ENABLE_FEATURE_LESS_RAW
+	if (option_mask32 & FLAG_R)
+		printf(NORMAL);
+#endif
 }
 
 /* Print the buffer */
